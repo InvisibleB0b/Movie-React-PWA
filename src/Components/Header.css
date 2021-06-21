@@ -1,0 +1,17 @@
+a, a:hover{
+    color: black;
+}
+
+img{
+    display: block;
+width: 100%;
+height: auto;
+}
+
+.center{
+    margin: 0 auto;
+}
+
+li{
+    list-style-type: none;
+}

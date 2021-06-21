@@ -7,10 +7,13 @@
 // You can also remove this file if you'd prefer not to use a
 // service worker, and the Workbox build step will be skipped.
 
+import { act } from 'react-dom/test-utils';
 import { clientsClaim } from 'workbox-core';
+import { canConstructReadableStream } from 'workbox-core/_private';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { precacheAndRoute, createHandlerBoundToURL } from 'workbox-precaching';
 import { registerRoute } from 'workbox-routing';
+import { NetworkOnly } from 'workbox-strategies';
 import { StaleWhileRevalidate } from 'workbox-strategies';
 
 clientsClaim();
@@ -64,9 +67,101 @@ registerRoute(
 // This allows the web app to trigger skipWaiting via
 // registration.waiting.postMessage({type: 'SKIP_WAITING'})
 self.addEventListener('message', (event) => {
+
+  console.log(event);
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
 });
 
-// Any other custom service worker logic can go here.
+// // Any other custom service worker logic can go here.
+
+const cacheName = 'test-v1';
+
+const resourcesToPrecache = [
+  '/',
+  'index.html',
+  'favicon.ico'
+];
+
+
+
+self.addEventListener('install', async (event) => {
+
+  self.skipWaiting();
+  console.log("installing");
+
+  event.waitUntil(
+
+    caches.open(cacheName)
+      .then(cache => {
+        return cache.addAll(resourcesToPrecache);
+      }).catch(err => {
+        console.log("Couldnt cache")
+      })
+
+  );
+
+});
+
+const regger = new RegExp("^\/movie\/[1-9]+$");
+registerRoute(
+  ({ url }) => url.pathname.match(regger),
+  new StaleWhileRevalidate({
+    cacheName: 'movies-cached',
+    plugins: [new ExpirationPlugin({
+      maxAgeSeconds: 7 * 24 * 60 * 60,
+      maxEntries: 5
+    })]
+  })
+)
+
+registerRoute(
+  ({ url }) => url.pathname.startsWith("/movies"),
+  new NetworkOnly()
+)
+
+
+self.addEventListener('fetch', event => {
+  event.respondWith(
+    caches.match(event.request)
+      .then(cachedResponse => {
+        return cachedResponse || fetch(event.request);
+      })
+  );
+});
+
+
+self.addEventListener('push', function (e) {
+  if (Notification.permission == 'granted') {
+
+    let test = e.data.text();
+    var options = JSON.parse(test);
+    e.waitUntil(
+      self.registration.showNotification(options.data.title, options)
+    );
+  } else {
+    return;
+  }
+});
+
+
+self.addEventListener('notificationclick', (e) => {
+  var notification = e.notification;
+  var primaryKey = notification.data.primaryKey;
+  var action = e.action;
+
+
+  if (action === 'close') {
+    notification.close();
+  } else {
+    clients.openWindow(notification.data.url);
+    notification.close();
+  }
+})
+
+function TestForNotification() {
+
+
+
+}
